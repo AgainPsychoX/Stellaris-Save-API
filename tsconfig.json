@@ -1,0 +1,42 @@
+{
+	"compilerOptions": {
+		"baseUrl": "./",
+		"rootDir": "src/",
+		"outDir": "./dist/",
+		"paths": {
+			"@/*": ["./src/*"],
+		},
+
+		"target": "ES2020",
+		"module": "ES2020",
+		"moduleResolution": "Node",
+		"resolveJsonModule": true,
+		"isolatedModules": true,
+		"lib": ["ES2020"],
+		"types": [
+			"node"
+		],
+		"strict": true,
+		"declaration": false,
+		"skipLibCheck": true,
+		"esModuleInterop": true,
+		"incremental": true,
+		"sourceMap": true,
+		"forceConsistentCasingInFileNames": true,
+
+		"allowSyntheticDefaultImports": true,
+		"noUnusedLocals": true,
+		"noUnusedParameters": false,
+		"noImplicitReturns": true,
+		"noFallthroughCasesInSwitch": true,
+		"noUncheckedIndexedAccess": true,
+		"noImplicitOverride": true,
+		// "strictPropertyInitialization": false
+	},
+	// "include": ["src"],
+	"ts-node": {
+		"transpileOnly": true,
+		"files": true,
+		"preferTsExts": true,
+	}
+}
