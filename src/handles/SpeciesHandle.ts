@@ -1,13 +1,13 @@
-import { ParadoxDataObject, ParadoxDataObjectHandle } from "@/utils/paradox";
+import { ParadoxDataEntryHandle, ParadoxDataObject, ParadoxDataObjectHandle } from "@/utils/paradox";
 
 export class SpeciesHandle extends ParadoxDataObjectHandle {
 	readonly index: number;
 
 	constructor(
-		entry: ParadoxDataObject | ParadoxDataObjectHandle,
+		entry: ParadoxDataObject | ParadoxDataObjectHandle | ParadoxDataEntryHandle,
 		index: number = -1,
 	) {
-		super(entry instanceof ParadoxDataObjectHandle ? entry._object : entry);
+		super(entry);
 		this.index = index;
 	}
 

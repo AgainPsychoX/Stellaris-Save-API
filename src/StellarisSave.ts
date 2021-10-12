@@ -1,15 +1,20 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { ParadoxDataEntry, ParadoxDataHelper, ParadoxDataObject, ParadoxDataObjectHandle } from "./utils/paradox";
-import { precursorsFlags, SystemHandle } from './handles/SystemHandle';
-import { SpeciesHandle } from './handles/SpeciesHandle';
-import { CoordsPair, isCoordsPair } from './handles/CoordsHandle';
 import { MyError, ParserError } from './utils/common';
-import { PlanetHandle } from './handles/PlanetHandle';
-import { NebulaHandle } from './handles/NebulaHandle';
-import { LeaderHandle } from './handles/LeaderHandle';
 import { getSafeTemporaryDirectory, packTemporaryFilesIntoSave, unpackSaveIntoTemporaryFiles } from './utils/packing';
-import { CountryHandle } from '.';
+import SystemHandle, { precursorsFlags } from './handles/SystemHandle';
+import SpeciesHandle from './handles/SpeciesHandle';
+import CoordsPair, { isCoordsPair } from './handles/CoordsHandle';
+import PlanetHandle from './handles/PlanetHandle';
+import NebulaHandle from './handles/NebulaHandle';
+import LeaderHandle from './handles/LeaderHandle';
+import CountryHandle from './handles/CountryHandle';
+import ShipDesignHandle from './handles/ShipDesignHandle';
+import ShipHandle from './handles/ShipHandle';
+import FleetHandle from './handles/FleetHandle';
+import ArmyHandle from './handles/ArmyHandle';
+import SectorHandle from './handles/SectorHandle';
 
 export class StellarisSave {
 	/**
@@ -23,9 +28,15 @@ export class StellarisSave {
 	nebulas: NebulaHandle[];
 	systems: SystemHandle[];
 	planets: PlanetHandle[];
-	countries: CountryHandle[];
 	species: SpeciesHandle[];
 	leaders: LeaderHandle[];
+	countries: CountryHandle[];
+	shipDesigns: ShipDesignHandle[];
+	ships: ShipHandle[];
+	fleets: FleetHandle[];
+	armies: ArmyHandle[];
+	sectors: SectorHandle[];
+	// TODO: refactor those handle into maps (id/index -> handle) instead lists?
 
 	constructor(
 		meta: ParadoxDataEntry[],
@@ -35,22 +46,37 @@ export class StellarisSave {
 		this.gamestate = new ParadoxDataObjectHandle(gamestate);
 
 		this.nebulas = this.gamestate.$$('nebula')
-			.map(e => new NebulaHandle(e))
+			.map(e => new NebulaHandle(e, this))
 		;
 		this.systems = this.gamestate.$('galactic_object').$$()
 			.map(e => new SystemHandle(e, this))
 		;
 		this.planets = this.gamestate.$('planets').$('planet').$$()
-			.map(e => new PlanetHandle(e))
-		;
-		this.countries = this.gamestate.$('country').$$()
-			.map(e => new CountryHandle(e, this))
+			.map(e => new PlanetHandle(e, this))
 		;
 		this.species = (this.gamestate.$('species_db')._ as ParadoxDataObject)
 			.map((e, i) => new SpeciesHandle(e[1] as ParadoxDataObject, i))
 		;
 		this.leaders = this.gamestate.$('leaders').$$()
-			.map(e => new LeaderHandle(e))
+			.map(e => new LeaderHandle(e, this))
+		;
+		this.countries = this.gamestate.$('country').$$()
+			.map(e => new CountryHandle(e, this))
+		;
+		this.shipDesigns = this.gamestate.$('ship_design').$$()
+			.map(e => new ShipDesignHandle(e))
+		;
+		this.ships = this.gamestate.$('ships').$$()
+			.map(e => new ShipHandle(e, this))
+		;
+		this.fleets = this.gamestate.$('fleets').$$()
+			.map(e => new FleetHandle(e, this))
+		;
+		this.armies = this.gamestate.$('army').$$()
+			.map(e => new ArmyHandle(e, this))
+		;
+		this.sectors = this.gamestate.$('sectors').$$()
+			.map(e => new SectorHandle(e, this))
 		;
 	}
 
@@ -162,6 +188,7 @@ export class StellarisSave {
 	}
 
 	////////////////////////////////////////////////////////////////////////////////
+	// Nebulas
 
 	/**
 	 * Finds Nebula by name.
@@ -184,6 +211,9 @@ export class StellarisSave {
 		return this.nebulas.find(n => n.systemIds.includes(id));
 	}
 
+	////////////////////////////////////////////////////////////////////////////////
+	// System
+
 	/**
 	 * Finds system by ID.
 	 */
@@ -203,26 +233,46 @@ export class StellarisSave {
 	}
 
 	/**
+	 * Gets system handle by ID.
+	 * If can't find, throws error.
+	 */
+	getSystemById(id: number) {
+		const system = this.findSystemById(id);
+		if (!system) {
+			throw new MyError('system-not-found', `System not found by ID ${id}`);
+		}
+		return system;
+	}
+
+	/**
+	 * Finds system by name.
+	 * 
+	 * Warning! There might be multiple systems with the same name, 
+	 * in that case, only one will be returned.
+	 * 
+	 * If can't find, throws error.
+	 */
+	getSystemByName(name: string) {
+		const system = this.findSystemByName(name);
+		if (!system) {
+			throw new MyError('system-not-found', `System not found by name ${name}`);
+		}
+		return system;
+	}
+
+	/**
 	 * Gets system handle by ID, handle (pass) or name.
 	 * If can't find, throws error.
 	 */
 	getSystem(idOrHandleOrName: number | SystemHandle | string) {
 		if (typeof idOrHandleOrName === 'number') {
-			const system = this.findSystemById(idOrHandleOrName);
-			if (!system) {
-				throw new MyError('system-not-found', `System not found by ID ${idOrHandleOrName}`);
-			}
-			return system;
+			return this.getSystemById(idOrHandleOrName)
 		}
-		else if (idOrHandleOrName instanceof SystemHandle) {
+		if (idOrHandleOrName instanceof SystemHandle) {
 			return idOrHandleOrName;
 		}
 		else {
-			const system = this.findSystemByName(idOrHandleOrName);
-			if (!system) {
-				throw new MyError('system-not-found', `System not found by name ${idOrHandleOrName}`);
-			}
-			return system;
+			return this.getSystemByName(idOrHandleOrName);
 		}
 	}
 
@@ -260,34 +310,6 @@ export class StellarisSave {
 
 		return systemsSortedClosest.map(a => a[0]);
 	}
-
-	/**
-	 * Finds planet by ID.
-	 */
-	findPlanetById(id: number) {
-		// We assume they cannot be removed or reordered.
-		return this.planets[id];
-	}
-
-	/**
-	 * Finds species by species index, as they don't have normal IDs
-	 * for some reason.
-	 */
-	findSpeciesByIndex(index: number) {
-		return this.species[index];
-	}
-
-	/**
-	 * Finds species by name.
-	 * 
-	 * Warning! There might be multiple species with the same name, 
-	 * in that case, only one will be returned.
-	 */
-	findSpeciesByName(name: string) {
-		return this.species.find(s => s.name === `"${name}"`);
-	}
-
-	////////////////////////////////////////////////////////////////////////////////
 
 	swapTwoStarSystems(
 		a: SystemHandle | number, 
@@ -361,6 +383,216 @@ export class StellarisSave {
 			});
 		}
 	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Planet
+
+	/**
+	 * Finds planet by ID.
+	 */
+	findPlanetById(id: number) {
+		// We assume they cannot be removed or reordered.
+		return this.planets[id];
+	}
+
+	/**
+	 * Finds planet by ID.
+	 * If can't find, throws error.
+	 */
+	 getPlanetById(id: number) {
+		const planet = this.findPlanetById(id);
+		if (!planet) {
+			throw new MyError('Planet-not-found', `Planet not found by ID ${id}`);
+		}
+		return planet;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+
+	/**
+	 * Finds leader by ID.
+	 */
+	findLeaderById(id: number) {
+		return this.leaders.find(h => h.id === id);
+	}
+
+	/**
+	 * Finds leader by ID.
+	 * If can't find, throws error.
+	 */
+	getLeaderById(id: number) {
+		const leader = this.findLeaderById(id);
+		if (!leader) {
+			throw new MyError('leader-not-found', `Leader not found by ID ${id}`);
+		}
+		return leader;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Species
+
+	/**
+	 * Finds species by species index, as they don't have normal IDs
+	 * for some reason.
+	 */
+	findSpeciesByIndex(index: number) {
+		return this.species[index];
+	}
+
+	/**
+	 * Finds species by species index, as they don't have normal IDs
+	 * for some reason. If can't find, throws error.
+	 */
+	getSpeciesByIndex(index: number) {
+		const species = this.findSpeciesByIndex(index);
+		if (!species) {
+			throw new MyError('species-not-found', `Species not found by index ${index}`);
+		}
+		return species;
+	}
+
+	/**
+	 * Finds species by name.
+	 * 
+	 * Warning! There might be multiple species with the same name, 
+	 * in that case, only one will be returned.
+	 */
+	findSpeciesByName(name: string) {
+		return this.species.find(s => s.name === `"${name}"`);
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Country
+
+	/**
+	 * Finds country by ID.
+	 */
+	findCountryById(id: number) {
+		return this.countries.find(h => h.id === id);
+	}
+
+	/**
+	 * Finds country by ID.
+	 * If can't find, throws error.
+	 */
+	getCountryById(id: number) {
+		const country = this.findCountryById(id);
+		if (!country) {
+			throw new MyError('country-not-found', `Country not found by ID ${id}`);
+		}
+		return country;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Ship design
+
+	/**
+	 * Finds ship design by ID.
+	 * If can't find, throws error.
+	 */
+	findShipDesignById(id: number) {
+		return this.shipDesigns.find(h => h.id === id);
+	}
+
+	/**
+	 * Finds ship design by ID.
+	 */
+	getShipDesignById(id: number) {
+		const design = this.shipDesigns.find(h => h.id === id);
+		if (!design) {
+			throw new MyError('ship-design-not-found', `Ship design not found by ID ${id}`);
+		}
+		return design;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Ship
+
+	/**
+	 * Finds ship by ID.
+	 */
+	findShipById(id: number) {
+		return this.ships.find(h => h.id === id);
+	}
+
+	/**
+	 * Finds ship by ID.
+	 * If can't find, throws error.
+	 */
+	getShipById(id: number) {
+		const ship = this.ships.find(h => h.id === id);
+		if (!ship) {
+			throw new MyError('ship-not-found', `Ship not found by ID ${id}`);
+		}
+		return ship;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Fleet
+
+	/**
+	 * Finds fleet by ID.
+	 */
+	findFleetById(id: number) {
+		return this.fleets.find(h => h.id === id);
+	}
+
+	/**
+	 * Finds fleet by ID.
+	 * If can't find, throws error.
+	 */
+	getFleetById(id: number) {
+		const fleet = this.fleets.find(h => h.id === id);
+		if (!fleet) {
+			throw new MyError('fleet-not-found', `Fleet not found by ID ${id}`);
+		}
+		return fleet;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Army
+
+	/**
+	 * Finds army by ID.
+	 */
+	findArmyById(id: number) {
+		return this.armies.find(h => h.id === id);
+	}
+
+	/**
+	 * Finds army by ID.
+	 * If can't find, throws error.
+	 */
+	getArmyById(id: number) {
+		const army = this.armies.find(h => h.id === id);
+		if (!army) {
+			throw new MyError('army-not-found', `Army not found by ID ${id}`);
+		}
+		return army;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+
+	/**
+	 * Finds sector by ID.
+	 */
+	findSectorById(id: number) {
+		return this.sectors.find(h => h.id === id);
+	}
+
+	/**
+	 * Finds sector by ID.
+	 * If can't find, throws error.
+	 */
+	getSectorById(id: number) {
+		const sector = this.sectors.find(h => h.id === id);
+		if (!sector) {
+			throw new MyError('sector-not-found', `Sector not found by ID ${id}`);
+		}
+		return sector;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
 }
 
 export default StellarisSave;

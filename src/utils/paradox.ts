@@ -27,7 +27,7 @@ export type ParadoxDataObject = ParadoxDataEntry[];
 
 export const stripSidesByCharacter = (string: string) => string.substring(1, string.length - 1);
 
-/// Serializes and deserializes Paradox save data to and from Javascript accessable form:
+/// Serializes and deserializes Paradox save data to and from Javascript accessible form:
 /// * statement form entry - array with up to 2 elements: key and value, or sole value.
 /// * key can be one of: number, string or null if not existing (solo value entry).
 /// * value can be one of: number, string or array of children entries.
@@ -93,6 +93,7 @@ export class ParadoxDataHelper {
 			}
 			// String "..."
 			else if (charCode === 34) {
+				const start = i;
 				let end = i;
 				do {
 					end = string.indexOf('"', end + 1);
@@ -100,7 +101,10 @@ export class ParadoxDataHelper {
 				while (string.charAt(end - 1) == '\\');
 				
 				if (end === -1) {
-					throw new Error('string not closed');
+					throw new ParserError(
+						'parser/string-not-closed', `string not closed`,
+						undefined, string, [{offset: start, comment: 'String start'}]
+					);
 				}
 				const tmp = string.substring(i, end + 1);
 				i = end + 1;
@@ -274,13 +278,24 @@ type EntriesFilter = (key: string | number | null, value: ParadoxDataPiece) => b
 /**
  * Object handle helper class, easing access to sub-elements.
  * 
- * Object is set of entries, e.g. `foo = { bar = 123 xyz = "ASDF" }`.
+ * Object is set of entries, e.g. `foo = { bar = 123 xyz = "Lorem Ipsum" }`.
  */
 export class ParadoxDataObjectHandle {
 	_object: ParadoxDataObject;
 
-	constructor(object: ParadoxDataObject) {
-		this._object = object;
+	constructor(object: ParadoxDataObject | ParadoxDataObjectHandle | ParadoxDataEntryHandle) {
+		if (object instanceof ParadoxDataEntryHandle) {
+			if (!Array.isArray(object._entry)) {
+				throw new ReferenceError(`trying to get object handle for entry value of primitive type`);
+			}
+			this._object = object._entry[1] as ParadoxDataObject;
+		}
+		else if (object instanceof ParadoxDataObjectHandle) {
+			this._object = object._object;
+		}
+		else {
+			this._object = object;
+		}
 	}
 
 	/**
@@ -323,7 +338,33 @@ export class ParadoxDataObjectHandle {
 		;
 	}
 
-	
+	/**
+	 * Assuming entry contains the object, removes subentry of that object.
+	 */
+	removeSubentry(entry: ParadoxDataEntry | ParadoxDataEntryHandle) {
+		const other = entry instanceof ParadoxDataEntryHandle ? entry._entry : entry;
+		const index = this._object.indexOf(other);
+		if (index !== -1) {
+			this._object.splice(index, 1);
+		}
+	}
+
+	/**
+	 * Assuming entry contains the object, removes all subentries 
+	 * of that object with selected key.
+	 */
+	removeSubentriesByKey(key: string) {
+		let i = 0;
+		while (i < this._object.length) {
+			if (this._object[i]![0] === key) {
+				this._object.splice(i, 1);
+			}
+			else {
+				i += 1;
+			}
+		}
+	}
+
 	/**
 	 * Value, as underlying array.
 	 */
@@ -342,13 +383,13 @@ export class ParadoxDataObjectHandle {
 /**
  * Entry handle helper class, easing access to sub-elements.
  * 
- * Entry is pair of key and value, e.g. `foo = { bar = 123 xyz = "ASDF" }`.
+ * Entry is pair of key and value, e.g. `foo = { bar = 123 xyz = "Lorem Ipsum" }`.
  */
 export class ParadoxDataEntryHandle {
 	_entry: ParadoxDataEntry;
-	
-	constructor(entry: ParadoxDataEntry) {
-		this._entry = entry;
+
+	constructor(entry: ParadoxDataEntry | ParadoxDataEntryHandle) {
+		this._entry = entry instanceof ParadoxDataEntryHandle ? entry._entry : entry;
 	}
 
 	/**
@@ -357,22 +398,15 @@ export class ParadoxDataEntryHandle {
 	 * @throws `ReferenceError` in case the entry contains no entries (primitives type).
 	 */ 
 	$ (key: string | number) {
-		if (this._entry[1] === undefined) {
-			this._entry[1] = [];
-		}
-		if (Array.isArray(this._entry[1])) {
-			const entry = this._entry[1].find(e => e[0] === key);
-			if (entry) {
-				return new ParadoxDataEntryHandle(entry);
-			}
-			else {
-				const newEntry = [key, undefined] as ParadoxDataEntry;
-				this._entry[1].push(newEntry);
-				return new ParadoxDataEntryHandle(newEntry);
-			}
+		const entries = this.valueAsObject();
+		const entry = entries.find(e => e[0] === key);
+		if (entry) {
+			return new ParadoxDataEntryHandle(entry);
 		}
 		else {
-			throw new ReferenceError(`this entry contains primitive type (${typeof this._entry[1]})`);
+			const newEntry = [key, undefined] as ParadoxDataEntry;
+			entries.push(newEntry);
+			return new ParadoxDataEntryHandle(newEntry);
 		}
 	}
 
@@ -383,28 +417,50 @@ export class ParadoxDataEntryHandle {
 	 * @throws `ReferenceError` in case the entry contains no entries (primitives type).
 	 */ 
 	$$ (key?: string | number | null | undefined | EntriesFilter) {
-		if (this._entry[1] === undefined) {
-			this._entry[1] = [];
-		}
-		if (Array.isArray(this._entry[1])) {
-			if (key === undefined) {
-				return this._entry[1]
-					.map(e => new ParadoxDataEntryHandle(e))
-				;
-			}
-			if (typeof key === 'function') {
-				return this._entry[1]
-					.filter(e => key(e[0], e[1]))
-					.map(e => new ParadoxDataEntryHandle(e))
-				;
-			}
-			return this._entry[1]
-				.filter(e => e[0] === key)
+		const entries = this.valueAsObject();
+		if (key === undefined) {
+			return entries
 				.map(e => new ParadoxDataEntryHandle(e))
 			;
 		}
-		else {
-			throw new ReferenceError(`this entry contains primitive type (${typeof this._entry[1]})`);
+		if (typeof key === 'function') {
+			return entries
+				.filter(e => key(e[0], e[1]))
+				.map(e => new ParadoxDataEntryHandle(e))
+			;
+		}
+		return entries
+			.filter(e => e[0] === key)
+			.map(e => new ParadoxDataEntryHandle(e))
+		;
+	}
+
+	/**
+	 * Assuming entry contains the object, removes subentry of that object.
+	 */
+	removeSubentry(entry: ParadoxDataEntry | ParadoxDataEntryHandle) {
+		const entires = this.valueAsObject();
+		const other = entry instanceof ParadoxDataEntryHandle ? entry._entry : entry;
+		const index = entires.indexOf(other);
+		if (index !== -1) {
+			entires.splice(index, 1);
+		}
+	}
+
+	/**
+	 * Assuming entry contains the object, removes all subentries 
+	 * of that object with selected key.
+	 */
+	removeSubentriesByKey(key: string) {
+		const entires = this.valueAsObject();
+		let i = 0;
+		while (i < entires.length) {
+			if (entires[i]![0] === key) {
+				entires.splice(i, 1);
+			}
+			else {
+				i += 1;
+			}
 		}
 	}
 
@@ -426,6 +482,31 @@ export class ParadoxDataEntryHandle {
 	}
 	set value (value: ParadoxDataPiece) {
 		this._entry[1] = value;
+	}
+
+	// TODO: add $ and $$ proper names, make $ and $$ just shorthands
+	// TODO: refactor project to use `valueAsObject` and similar
+	// TODO: `valueAsString`
+	// TODO: `valueAsWord`
+	// TODO: `valueAsNumber`
+	// TODO: remove `_`?
+	// TODO: make `_entry` protected?
+
+	/**
+	 * Gets value in the entry, asserting it's object. 
+	 * If it's undefined, sets value as empty object.
+	 * @throws `ReferenceError` in case the entry is not object.
+	 */
+	valueAsObject(): ParadoxDataObject {
+		if (!Array.isArray(this._entry[1])) {
+			if (this._entry[1] === undefined) {
+				this._entry[1] = [];
+			}
+			else {
+				throw new ReferenceError(`expected object value`);
+			}
+		}
+		return this._entry[1];
 	}
 
 	/**

@@ -1,7 +1,9 @@
-import { $, ParadoxDataEntry, ParadoxDataEntryHandle, ParadoxDataObject } from "@/utils/paradox";
+import { $, ParadoxDataEntry, ParadoxDataEntryHandle, ParadoxDataObject, stripSidesByCharacter } from "@/utils/paradox";
 import StellarisSave from "@/StellarisSave";
 import { MyError } from "@/utils/common";
 import { CoordsHandle } from "./CoordsHandle";
+import { PlanetHandle } from "..";
+import SectorHandle, { UndefinedSectorId } from "./SectorHandle";
 
 
 export const precursorsFlags = ['precursor_1', 'precursor_2', 'precursor_3', 'precursor_4', 'precursor_5', 'precursor_zroni_1', 'precursor_baol_1'] as const;
@@ -26,7 +28,7 @@ export class SystemHandle extends ParadoxDataEntryHandle {
 		entry: ParadoxDataEntry | ParadoxDataEntryHandle,
 		save: StellarisSave,
 	) {
-		super(entry instanceof ParadoxDataEntryHandle ? entry._entry : entry);
+		super(entry);
 		this._save = save;
 	}
 
@@ -35,10 +37,10 @@ export class SystemHandle extends ParadoxDataEntryHandle {
 	}
 
 	get name() {
-		return this.$('name')._ as string;
+		return stripSidesByCharacter(this.$('name')._ as string);
 	}
 	set name(value: string) {
-		this.$('name')._ = value;
+		this.$('name')._ = `"${value}"`;
 	}
 
 	get coords() {
@@ -66,17 +68,17 @@ export class SystemHandle extends ParadoxDataEntryHandle {
 	}
 
 	get initializer() {
-		return this.$('initializer')._ as string;
+		return stripSidesByCharacter(this.$('initializer')._ as string);
 	}
 	set initializer(value: string) {
-		this.$('initializer')._ = value;
+		this.$('initializer')._ = `"${value}"`;
 	}
 
 	get starClass() {
-		return this.$('star_class')._ as string;
+		return stripSidesByCharacter(this.$('star_class')._ as string);
 	}
 	set starClass(value: string) {
-		this.$('star_class')._ = value;
+		this.$('star_class')._ = `"${value}""`;
 	}
 
 	addHyperlanes(
@@ -181,10 +183,12 @@ export class SystemHandle extends ParadoxDataEntryHandle {
 		return this;
 	}
 
-	get planetIds() {
+	// TODO: neighbor systems
+
+	get planetIds(): ReadonlyArray<number> {
 		return this.$$('planet').map(e => e._ as number);
 	}
-	get planets() {
+	get planets(): ReadonlyArray<PlanetHandle> {
 		return this.planetIds.map(id => {
 			const planet = this._save.findPlanetById(id);
 			if (!planet) {
@@ -192,6 +196,17 @@ export class SystemHandle extends ParadoxDataEntryHandle {
 			}
 			return planet;
 		});
+	}
+
+	get sectorId() {
+		return this.$('sector')._ as number;
+	}
+	getSector() {
+		return this.sectorId === UndefinedSectorId ? undefined : this._save.getSectorById(this.sectorId);
+	}
+	setSector(idOrHandle: number | SectorHandle | undefined) {
+		const id = idOrHandle instanceof SectorHandle ? idOrHandle.id : idOrHandle;
+		this.$('sector')._ = id == undefined ? id : UndefinedSectorId;
 	}
 	
 	// TODO: add/remove planets

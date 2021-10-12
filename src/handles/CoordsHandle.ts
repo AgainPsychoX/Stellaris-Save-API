@@ -1,4 +1,4 @@
-import { ParadoxDataObject, ParadoxDataObjectHandle } from "@/utils/paradox";
+import { ParadoxDataEntryHandle, ParadoxDataObject, ParadoxDataObjectHandle } from "@/utils/paradox";
 
 export interface CoordsPair {
 	x: number;
@@ -16,7 +16,7 @@ export interface CoordsData extends CoordsPair {
 }
 
 export class CoordsHandle extends ParadoxDataObjectHandle {
-	constructor(object: ParadoxDataObject) {
+	constructor(object: ParadoxDataObject | ParadoxDataEntryHandle) {
 		super(object);
 	}
 
@@ -82,6 +82,18 @@ export class CoordsHandle extends ParadoxDataObjectHandle {
 		const y = -1*(x - (A.x+B.x)/2)/aSlope +  (A.y+B.y)/2;
 
 		return CoordsHandle.forNewObject(x, y, A.origin);
+	}
+
+	static averageForPoints(...points: CoordsData[]): CoordsHandle;
+	static averageForPoints(first: CoordsData, ...points: CoordsPair[]): CoordsHandle {
+		let sumX = first.x;
+		let sumY = first.y;
+		for (const point of points) {
+			sumX += point.x;
+			sumY += point.y;
+		}
+		const count = 1 + points.length;
+		return CoordsHandle.forNewObject(sumX / count, sumY / count, first.origin);
 	}
 }
 

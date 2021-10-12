@@ -1,5 +1,6 @@
 
 import { Command, Option } from "commander";
+import registerCombatTestCommand from "./commands/CombatTestCommand";
 import registerInteractiveCommand from "./commands/InteractiveCommand";
 import registerListCommand from "./commands/ListCommand";
 import { registerPackCommand, registerUnpackCommand } from "./commands/PackingCommands";
@@ -48,6 +49,7 @@ registerUnpackCommand(program);
 registerInteractiveCommand(program);
 registerPrecursorsCommand(program);
 registerReportCommand(program);
+registerCombatTestCommand(program);
 
 program
 	.parseAsync(process.argv)

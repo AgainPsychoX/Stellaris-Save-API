@@ -1,19 +1,24 @@
-import { ParadoxDataEntry, ParadoxDataEntryHandle, ParadoxDataObject } from "@/utils/paradox";
+import StellarisSave from "@/StellarisSave";
+import { ParadoxDataEntry, ParadoxDataEntryHandle, ParadoxDataObject, stripSidesByCharacter } from "@/utils/paradox";
 import { CoordsHandle } from "./CoordsHandle";
 import { SystemHandle } from "./SystemHandle";
 
 export class NebulaHandle extends ParadoxDataEntryHandle {
+	_save: StellarisSave;
+
 	constructor(
-		entry: ParadoxDataEntry | ParadoxDataEntryHandle
+		entry: ParadoxDataEntry | ParadoxDataEntryHandle,
+		save: StellarisSave,
 	) {
-		super(entry instanceof ParadoxDataEntryHandle ? entry._entry : entry);
+		super(entry);
+		this._save = save;
 	}
 
 	get name() {
-		return this.$('name')._ as string;
+		return stripSidesByCharacter(this.$('name')._ as string);
 	}
 	set name(value: string) {
-		this.$('name')._ = value;
+		this.$('name')._ = `"${value}"`;
 	}
 
 	get coords() {
@@ -49,11 +54,11 @@ export class NebulaHandle extends ParadoxDataEntryHandle {
 		// TODO: remove nebula visuals (ambient objects)
 	}
 
-	get systemIds() {
-		return (this._ as ParadoxDataObject)
-			.filter(e => e[0] === 'galactic_object')
-			.map(e => e[1] as number)
-		;
+	get systemIds(): ReadonlyArray<number> {
+		return this.$$('galactic_object').map(h => h.value as number);
+	}
+	get systems(): ReadonlyArray<SystemHandle> {
+		return this.systemIds.map(id => this._save.getSystemById(id));
 	}
 }
 
