@@ -272,6 +272,7 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 		// TODO: factions
 
 		// Remove fleets
+		const systemsVisited: number[] = [];
 		for (const fleet of this._save.fleets) {
 			if (fleet.ownerId === this.id) {
 				for (const ship of fleet.ships) {
@@ -279,6 +280,14 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 				}
 				fleet.unassignOrbit();
 				fleet.value = undefined;
+				if (fleet.isStation) {
+					const systemId = fleet.coords.origin;
+					if (!systemsVisited.includes(systemId)) {
+						systemsVisited.push(systemId);
+						const system = this._save.getSystemById(systemId);
+						system.setStarbase(undefined);
+					}
+				}
 			}
 		}
 
@@ -291,7 +300,7 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 			}
 		}
 
-		// Remove controller flag and colonies
+		// Remove controller flag, colonies, local starbase
 		for (const planet of this._save.planets) {
 			if (planet.ownerId === this.id) {
 				planet.decolonize();

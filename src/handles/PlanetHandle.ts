@@ -59,6 +59,13 @@ export class PlanetHandle extends ParadoxDataEntryHandle {
 	////////////////////////////////////////////////////////////////////////////////
 	// Related
 
+	get systemId() {
+		return this.coords.origin;
+	}
+	get system() {
+		return this._save.getSystemById(this.systemId);
+	}
+
 	get ownerId() {
 		return this.$('owner')._ as number | undefined;
 	}

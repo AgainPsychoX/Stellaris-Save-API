@@ -4,6 +4,7 @@ import { MyError } from "@/utils/common";
 import { CoordsHandle } from "./CoordsHandle";
 import { PlanetHandle } from "..";
 import SectorHandle, { UndefinedSectorId } from "./SectorHandle";
+import ShipHandle from "./ShipHandle";
 
 
 export const precursorsFlags = ['precursor_1', 'precursor_2', 'precursor_3', 'precursor_4', 'precursor_5', 'precursor_zroni_1', 'precursor_baol_1'] as const;
@@ -184,6 +185,17 @@ export class SystemHandle extends ParadoxDataEntryHandle {
 	}
 
 	// TODO: neighbor systems
+
+	get starbaseId() {
+		return this.$('starbase')._ as number | undefined;
+	}
+	getStarbase() {
+		return this.starbaseId == undefined ? undefined : this._save.getShipById(this.starbaseId);
+	}
+	setStarbase(idOrHandle: number | ShipHandle | undefined) {
+		const id = idOrHandle instanceof ShipHandle ? idOrHandle.id : idOrHandle;
+		this.$('starbase')._ = id;
+	}
 
 	get planetIds(): ReadonlyArray<number> {
 		return this.$$('planet').map(e => e._ as number);

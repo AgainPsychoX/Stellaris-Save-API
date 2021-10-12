@@ -33,6 +33,13 @@ export class FleetHandle extends ParadoxDataEntryHandle {
 	// TODO: stats, hps, power
 	// TODO: options (ground_support_stance, friends_should_follow, mobile/station flags)
 
+	get isStation() {
+		return this.$('station').value == 'yes';
+	}
+	set isStation(value: boolean) {
+		this.$('station').value = value ? 'yes' : undefined;
+	}
+
 	/**
 	 * Approximated coords of the fleet.
 	 */
