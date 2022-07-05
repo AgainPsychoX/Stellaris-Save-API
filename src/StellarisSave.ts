@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { ParadoxDataEntry, ParadoxDataHelper, ParadoxDataObject, ParadoxDataObjectHandle } from "./utils/paradox";
+import { ParadoxDataEntry, ParadoxDataHelper, ParadoxDataObject, ParadoxDataObjectHandle, stripSidesByCharacter } from "./utils/paradox";
 import { MyError, ParserError } from './utils/common';
 import { getSafeTemporaryDirectory, packTemporaryFilesIntoSave, unpackSaveIntoTemporaryFiles } from './utils/packing';
 import SystemHandle, { precursorsFlags } from './handles/SystemHandle';
@@ -15,6 +15,7 @@ import ShipHandle from './handles/ShipHandle';
 import FleetHandle from './handles/FleetHandle';
 import ArmyHandle from './handles/ArmyHandle';
 import SectorHandle from './handles/SectorHandle';
+import FleetTemplateHandle from './handles/FleetTemplateHandle';
 
 export class StellarisSave {
 	/**
@@ -34,6 +35,7 @@ export class StellarisSave {
 	shipDesigns: ShipDesignHandle[];
 	ships: ShipHandle[];
 	fleets: FleetHandle[];
+	fleetTemplates: FleetTemplateHandle[];
 	armies: ArmyHandle[];
 	sectors: SectorHandle[];
 	// TODO: refactor those handle into maps (id/index -> handle) instead lists?
@@ -46,38 +48,59 @@ export class StellarisSave {
 		this.gamestate = new ParadoxDataObjectHandle(gamestate);
 
 		this.nebulas = this.gamestate.$$('nebula')
+			.filter(e => e.value != 'none')
 			.map(e => new NebulaHandle(e, this))
 		;
 		this.systems = this.gamestate.$('galactic_object').$$()
+			.filter(e => e.value != 'none')
 			.map(e => new SystemHandle(e, this))
 		;
 		this.planets = this.gamestate.$('planets').$('planet').$$()
+			.filter(e => e.value != 'none')
 			.map(e => new PlanetHandle(e, this))
 		;
 		this.species = (this.gamestate.$('species_db')._ as ParadoxDataObject)
 			.map((e, i) => new SpeciesHandle(e[1] as ParadoxDataObject, i))
 		;
 		this.leaders = this.gamestate.$('leaders').$$()
+			.filter(e => e.value != 'none')
 			.map(e => new LeaderHandle(e, this))
 		;
 		this.countries = this.gamestate.$('country').$$()
+			.filter(e => e.value != 'none')
 			.map(e => new CountryHandle(e, this))
 		;
 		this.shipDesigns = this.gamestate.$('ship_design').$$()
-			.map(e => new ShipDesignHandle(e))
+			.map(e => new ShipDesignHandle(e, this))
 		;
 		this.ships = this.gamestate.$('ships').$$()
+			.filter(e => e.value != 'none')
 			.map(e => new ShipHandle(e, this))
 		;
-		this.fleets = this.gamestate.$('fleets').$$()
+		this.fleets = this.gamestate.$('fleet').$$()
+			.filter(e => e.value != 'none')
 			.map(e => new FleetHandle(e, this))
 		;
+		this.fleetTemplates = this.gamestate.$('fleet_template').$$()
+			.filter(e => e.value != 'none')
+			.map(e => new FleetTemplateHandle(e, this))
+		;
 		this.armies = this.gamestate.$('army').$$()
+			.filter(e => e.value != 'none')
 			.map(e => new ArmyHandle(e, this))
 		;
 		this.sectors = this.gamestate.$('sectors').$$()
+			.filter(e => e.value != 'none')
 			.map(e => new SectorHandle(e, this))
 		;
+		// TODO: add filtering for invalid values (i.e. 'none') where necessary
+
+		// Since around 3.3, the `country > fleet_template_manager > fleet_template` 
+		// seems to contain non-existing values sometimes. Let's delete those.
+		for (const country of this.countries) {
+			const handle = country.$('fleet_template_manager').$('fleet_template');
+			handle._ = handle.valueAsObject().filter(e => typeof e[1] == 'number' && this.findFleetTemplateById(e[1]));
+		}
 	}
 
 	/**
@@ -173,17 +196,20 @@ export class StellarisSave {
 	////////////////////////////////////////////////////////////////////////////////
 
 	get name() {
-		return this.gamestate.$('name')._ as string;
+		return stripSidesByCharacter(this.gamestate.$('name')._ as string);
 	}
 	set name(value: string) {
-		this.gamestate.$('name')._ = value;
+		this.gamestate.$('name')._ = `"${value}"`;
 	}
 
 	get version() {
-		return this.gamestate.$('version')._ as string;
+		return stripSidesByCharacter(this.gamestate.$('version')._ as string);
 	}
 
 	get date() {
+		return stripSidesByCharacter(this.gamestate.$('date')._ as string);
+	}
+	get dateRaw() {
 		return this.gamestate.$('date')._ as string;
 	}
 
@@ -547,6 +573,28 @@ export class StellarisSave {
 			throw new MyError('fleet-not-found', `Fleet not found by ID ${id}`);
 		}
 		return fleet;
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+	// Fleet templates
+
+	/**
+	 * Finds fleet template by ID.
+	 */
+	findFleetTemplateById(id: number) {
+		return this.fleetTemplates.find(h => h.id === id);
+	}
+
+	/**
+	 * Finds fleet template by ID.
+	 * If can't find, throws error.
+	 */
+	getFleetTemplateById(id: number) {
+		const template = this.fleetTemplates.find(h => h.id === id);
+		if (!template) {
+			throw new MyError('fleet-template-not-found', `Fleet template not found by ID ${id}`);
+		}
+		return template;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////

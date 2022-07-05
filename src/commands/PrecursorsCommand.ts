@@ -87,7 +87,7 @@ export const registerPrecursorsCommand = (parent: Command) => {
 		})
 	;
 	addSaveFileInputHandlingToCommand(that);
-	addSaveFileOutputHandlingToCommand(that);
+	addSaveFileOutputHandlingToCommand(that, { defaultOutSuffix: '.precursors' });
 	return that;
 }
 

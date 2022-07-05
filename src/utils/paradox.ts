@@ -1,6 +1,8 @@
 import { ParserError } from "./common";
 
-export type ParadoxDataPiece = string | number | ParadoxDataEntry[] | undefined;
+export type ParadoxDataPrimitive = string | number;
+
+export type ParadoxDataPiece = ParadoxDataPrimitive | ParadoxDataObject;
 
 export type ParadoxDataEntry = {
 	/**
@@ -11,7 +13,7 @@ export type ParadoxDataEntry = {
 	/**
 	 * Entry value. If undefined, entry will be omitted (not saved).
 	 */
-	1: ParadoxDataPiece;
+	1: ParadoxDataPiece | undefined;
 
 	/**
 	 * Operator, if any other than '='.
@@ -75,10 +77,10 @@ export class ParadoxDataHelper {
 			}
 		}
 
-		const getPiece = (): ParadoxDataPiece => {
+		const getPiece = (): ParadoxDataPiece | undefined => {
 			const charCode = string.charCodeAt(i);
-			// Name (a-z/A-Z)
-			if ((97 <= charCode && charCode <= 122) || (65 <= charCode && charCode <= 90)) {
+			// Name (a-z/A-Z) or variable (@)
+			if ((97 <= charCode && charCode <= 122) || (64 <= charCode && charCode <= 90)) {
 				const start = i;
 				i += 1;
 				skipSmallPrimitive();
@@ -273,7 +275,7 @@ export class ParadoxDataHelper {
 	}
 }
 
-type EntriesFilter = (key: string | number | null, value: ParadoxDataPiece) => boolean;
+type EntriesFilter = (key: string | number | null, value: ParadoxDataPiece | undefined) => boolean;
 
 /**
  * Object handle helper class, easing access to sub-elements.
@@ -477,10 +479,10 @@ export class ParadoxDataEntryHandle {
 	/**
 	 * Value in the entry.
 	 */
-	get value (): ParadoxDataPiece {
+	get value (): ParadoxDataPiece | undefined {
 		return this._entry[1];
 	}
-	set value (value: ParadoxDataPiece) {
+	set value (value: ParadoxDataPiece | undefined) {
 		this._entry[1] = value;
 	}
 
@@ -512,10 +514,10 @@ export class ParadoxDataEntryHandle {
 	/**
 	 * Shortcut for value.
 	 */
-	get _ (): ParadoxDataPiece {
+	get _ (): ParadoxDataPiece | undefined {
 		return this._entry[1];
 	}
-	set _ (value: ParadoxDataPiece) {
+	set _ (value: ParadoxDataPiece | undefined) {
 		this._entry[1] = value;
 	}
 }
@@ -524,7 +526,7 @@ export class ParadoxDataEntryHandle {
  * Prepares object handle for data piece, assuming its object.
  * Throws error if passed piece isn't valid object.
  */
-export const $ = (object: ParadoxDataPiece) => {
+export const $ = (object: ParadoxDataPiece | undefined) => {
 	if (!Array.isArray(object)) {
 		throw new TypeError(`expected data object`);
 	}

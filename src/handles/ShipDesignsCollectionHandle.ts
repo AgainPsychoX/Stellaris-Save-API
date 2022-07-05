@@ -41,7 +41,7 @@ export class ShipDesignsCollectionHandle extends ParadoxDataEntryHandle {
 	}
 
 	findByName(name: string) {
-		return this.handles.find(h => h.name.toLowerCase() === name.toLowerCase());
+		return this.handles.find(h => h.name?.toLowerCase() === name.toLowerCase());
 	}
 }
 

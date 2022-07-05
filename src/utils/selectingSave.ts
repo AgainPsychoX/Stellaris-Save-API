@@ -50,7 +50,7 @@ export const selectSaveFilePrompt = async (): Promise<string> => {
 		short: string;
 		value: string;
 		mtime: Date;
-	} | typeof inquirer.Separator;
+	} | inquirer.SeparatorOptions;
 	const saveFileChoices: Choice[] =
 		(await Promise.all(
 			saveFilesNames.map(async (name) => {
@@ -73,7 +73,7 @@ export const selectSaveFilePrompt = async (): Promise<string> => {
 		))
 		.sort((a, b) => b.mtime.getTime() - a.mtime.getTime())
 	;
-	saveFileChoices.push(inquirer.Separator);
+	saveFileChoices.push(new inquirer.Separator());
 
 	const { saveFileName } = await inquirer.prompt([{
 		name: 'saveFileName',

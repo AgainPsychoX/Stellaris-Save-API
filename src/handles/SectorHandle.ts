@@ -39,16 +39,16 @@ export class SectorHandle extends ParadoxDataEntryHandle {
 	////////////////////////////////////////////////////////////////////////////////
 	// Systems
 
-	get systemIds(): ReadonlyArray<number> {
+	get systemsIds(): ReadonlyArray<number> {
 		return this.$('systems').$$().map(e => e.value as number);
 	}
 	get systems(): ReadonlyArray<SystemHandle> {
-		return this.systemIds.map(id => this._save.getSystemById(id));
+		return this.systemsIds.map(id => this._save.getSystemById(id));
 	}
 
 	hasSystem(idOrHandle: SystemHandle | number) {
 		const id = typeof idOrHandle === 'object' ? idOrHandle.id : idOrHandle;
-		const entry = this.systemIds.includes(id);
+		const entry = this.systemsIds.includes(id);
 		return !!entry;
 	}
 	addSystem(idOrHandle: SystemHandle | number) {

@@ -1,3 +1,8 @@
+import { serialize, deserialize } from 'v8';
+import { access } from 'fs/promises';
+
+export const canAccess = (path: string, mode?: number) => 
+	new Promise<boolean>(r => access(path, mode).then(() => r(true)).catch(() => r(false)));
 
 export class MyError extends Error {
 	code: string;
@@ -135,3 +140,6 @@ export class ParserError extends MyError {
 	}
 }
 
+export const structuredClone= <T>(obj: T) => {
+	return deserialize(serialize(obj)) as T;
+};

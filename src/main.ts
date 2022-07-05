@@ -9,8 +9,7 @@ import registerReportCommand from "./commands/ReportCommand";
 import { runCleanUpTasks } from "./utils/cleanup";
 import { MyError } from "./utils/common";
 import { setGameDirectory } from "./utils/gameData";
-
-let isDebugActive = true;
+import { setupLogging } from "./utils/logging";
 
 if (process.platform != 'win32') {
 	console.error('Only Windows is support for now!')
@@ -27,16 +26,23 @@ program
 			.default(false)
 			.env('DEBUG')
 	)
+	.addOption(
+		new Option('--debug-except <exceptions>', 'output extra debugging info with exception for comma-separated list of named loggers')
+			.default(false)
+			.argParser(s => s && s.split(','))
+			.env('DEBUG_EXCEPT')
+			.implies({ debug: true })
+			.hideHelp()
+	)
 	// TODO: 
 	// .option('--saves-directory <path>', 'set custom saves directory')
 	.option('--game-directory <path>', 'set path to game directory (if not specified, tries to detect or continue without)')
-	.hook('preAction', async (thisCommand: Command, actionCommand: Command) => {
+	.hook('preAction', async (thisCommand, actionCommand) => {
 		const options = thisCommand.opts();
-		if (!options.debug) {
-			// Ignore debug output if no debug flag specified
-			console.debug = (..._: any[]) => void(0);
-			isDebugActive = false;
-		}
+
+		// Ignore debug output if no debug flag specified
+		setupLogging(!!options.debug, options.debugExcept);
+
 		if (options.gameDirectory) {
 			await setGameDirectory(options.gameDirectory);
 		}
@@ -54,7 +60,7 @@ registerCombatTestCommand(program);
 program
 	.parseAsync(process.argv)
 	.catch(error => {
-		console.error(isDebugActive ? error : error.toString());
+		console.error(error);
 		switch ((error as MyError).code) {
 			case 'no-game-directory':
 				console.error(`Use '--game-directory' option to provide custom path.`);

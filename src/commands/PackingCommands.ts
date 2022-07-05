@@ -2,7 +2,8 @@ import path from 'path';
 import process from 'process';
 import { Command } from 'commander';
 import { packTemporaryFilesIntoSave, unpackSaveIntoTemporaryFiles } from '@/utils/packing';
-import { addSaveFileInputHandlingToCommand, addSaveFileOutputHandlingToCommand } from './common';
+import { addSaveFileInputHandlingToCommand } from './common';
+import { canAccess, MyError } from '@/utils/common';
 
 export const registerPackCommand = (parent: Command) => {
 	const that = parent
@@ -10,7 +11,8 @@ export const registerPackCommand = (parent: Command) => {
 		.description('packs gamestate and meta files into valid save file')
 		.option('-i, --input <directory>', `path to directory containing meta and gamestate files to pack (default: current dir)`)
 		.option('-o, --output <savePath>', `output save file path (default: ./out.sav)`)
-		.action(async (options: { input?: string, output?: string }) => {
+		.option('-y, --overwrite', `overwrites file content`, false)
+		.action(async (options: { input?: string, output?: string, overwrite: boolean }) => {
 			if (!options.input) {
 				options.input = process.cwd();
 				// process.exit(22);
@@ -19,10 +21,17 @@ export const registerPackCommand = (parent: Command) => {
 			if (!options.output) {
 				options.output = path.join(process.cwd(), 'out.sav');
 			}
-			await packTemporaryFilesIntoSave(options.output, options.input, true);
+			
+			if (await canAccess(options.output)) {
+				if (!options.overwrite) {
+					// TODO: interactive question prompt?
+					setImmediate(() => console.error(`Remove it or use '--overwrite' option.`));
+					throw new MyError('pack/no-overwrite', `File '${options.output}' already exist.`);
+				}
+			}
+			await packTemporaryFilesIntoSave(options.output, options.input, true, options.overwrite);
 		})
 	;
-	addSaveFileOutputHandlingToCommand(that);
 	return that;
 }
 

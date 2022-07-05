@@ -1,10 +1,56 @@
-import { ParadoxDataEntry, ParadoxDataEntryHandle, ParadoxDataObject, stripSidesByCharacter } from "@/utils/paradox";
+import { $, ParadoxDataEntry, ParadoxDataEntryHandle, ParadoxDataObject, ParadoxDataObjectHandle, stripSidesByCharacter } from "@/utils/paradox";
+import { MyError } from "@/utils/common";
 import StellarisSave from "@/StellarisSave";
 import PlanetHandle from "./PlanetHandle";
 import ShipDesignsCollectionHandle from "./ShipDesignsCollectionHandle";
 import LeaderHandle from "./LeaderHandle";
-import { MyError } from "@/utils/common";
 import SectorHandle from "./SectorHandle";
+import FleetHandle from "./FleetHandle";
+import FleetTemplateHandle from "./FleetTemplateHandle";
+import SystemHandle from "./SystemHandle";
+
+export const UndefinedCountry = 4294967295;
+
+export class FleetOwnershipHandle extends ParadoxDataObjectHandle {
+	_owner: CountryHandle;
+
+	get _save() { 
+		return this._owner._save;
+	}
+
+	constructor(
+		object: ParadoxDataObject | ParadoxDataObjectHandle | ParadoxDataEntryHandle,
+		owner: CountryHandle,
+	) {
+		super(object);
+		this._owner = owner
+	}
+
+	get fleetId() {
+		return this.$('fleet')._ as number;
+	}
+	get fleet() {
+		return this._save.getFleetById(this.fleetId);
+	}
+
+	get ownerId() {
+		return this._owner.id;
+	}
+	get owner() {
+		return this._owner;
+	}
+
+	get previousOwnerId() {
+		const value = this.$('previous_owner')._ as number | undefined;
+		if (value == UndefinedCountry) return undefined;
+		return value;
+	}
+	get previousOwner() {
+		return this.previousOwnerId == undefined ? undefined : this._save.getCountryById(this.previousOwnerId);
+	}
+
+	// TODO: lease_period, debtor
+}
 
 export class CountryHandle extends ParadoxDataEntryHandle {
 	_save: StellarisSave;
@@ -25,10 +71,10 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 	}
 
 	get name() {
-		return stripSidesByCharacter(this.$('name')._ as string);
+		return stripSidesByCharacter(this.$('name').$('key')._ as string);
 	}
 	set name(value: string) {
-		this.$('name')._ = `"${value}"`;
+		this.$('name').$('key')._ = `"${value}"`;
 	}
 
 	get type() {
@@ -84,6 +130,20 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 	}
 	set origin(value: string | undefined) {
 		this.$('government').$('origin')._ = `"${value}"`;
+	}
+
+	get shipGraphicalCulture() {
+		return stripSidesByCharacter(this.$('graphical_culture').value as string);
+	}
+	set shipGraphicalCulture(value: string) {
+		this.$('graphical_culture').value = `"${value}"`;
+	}
+
+	get cityGraphicalCulture() {
+		return stripSidesByCharacter(this.$('city_graphical_culture').value as string);
+	}
+	set cityGraphicalCulture(value: string) {
+		this.$('city_graphical_culture').value = `"${value}"`;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////
@@ -161,6 +221,39 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 		}
 	}
 
+	////////////////////////////////////////////////////////////////////////////////
+
+	get visibleSystemsIds(): ReadonlyArray<number> {
+		return this.$('terra_incognita').$('systems').valueAsObject().map(e => e[1] as number);
+	}
+	get visibleSystems(): ReadonlyArray<SystemHandle> {
+		return this.visibleSystemsIds.map(id => this._save.getSystemById(id));
+	}
+
+	addSystemVisibility(idOrHandle: number | SystemHandle) {
+		const id = idOrHandle instanceof SystemHandle ? idOrHandle.id : idOrHandle;
+		const array = this.$('terra_incognita').$('systems').valueAsObject();
+		const index = array.findIndex(e => e[1] as number >= id); // keeping them sorted btw
+		if (index === -1) {
+			array.push([null, id]);		
+		}
+		else {
+			if (array[index]?.[1] == id) return; // already in
+			array.splice(index - 1, 0, [null, id]); // put before larger ID
+		}
+	}
+
+	removeSystemVisibility(idOrHandle: number | SystemHandle) {
+		const id = idOrHandle instanceof SystemHandle ? idOrHandle.id : idOrHandle;
+		const array = this.$('terra_incognita').$('systems').valueAsObject();
+		const index = array.findIndex(e => e[1] == id);
+		if (index !== -1) {
+			array.splice(index, 1);
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+
 	get ownedLeadersIds(): ReadonlyArray<number> {
 		return this.$('owned_leaders').$$().map(e => e._ as number);
 	}
@@ -205,9 +298,93 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 	// TODO: add leader
 	// TODO: unassigned lists that are cleaned up on save?
 
-	// TODO: fleets
+	////////////////////////////////////////////////////////////////////////////////
+
+	get fleetOwnerships(): ReadonlyArray<FleetOwnershipHandle> {
+		return this.$('fleets_manager').$('owned_fleets').valueAsObject()
+			.map(e => new FleetOwnershipHandle(e[1] as ParadoxDataObject, this));
+	}
+	get ownedFleetsIds(): ReadonlyArray<number> {
+		return this.fleetOwnerships.map(h => h.fleetId);
+	}
+	get ownedFleets(): ReadonlyArray<FleetHandle> {
+		return this.fleetOwnerships.map(h => h.fleet);
+	}
+
+	/**
+	 * Registers fleet as owned by this country. 
+	 * 
+	 * Changes ownership of the fleet (and ships) to the country.
+	 */
+	registerOwnedFleet(idOrHandle: number | FleetHandle) {
+		const id = idOrHandle instanceof FleetHandle ? idOrHandle.id : idOrHandle;
+		const array = this.$('fleets_manager').$('owned_fleets').valueAsObject();
+		const index = array.findIndex(o => $(o[1]).$('fleet')._ == id);
+		if (index === -1) {
+			array.push([null, [
+				['fleet', id],
+				['ownership_status', 'normal'],
+				// ['lease_period', 0],
+				// ['debtor', UndefinedCountry],
+				// ['previous_owner', UndefinedCountry],
+			]]);
+		}
+		// TODO: update fleet owner cache
+	}
+	/**
+	 * Unregisters fleet ownership. Ship will need have new owner assigned after.
+	 */
+	unregisterOwnedFleet(idOrHandle: number | FleetHandle) {
+		const id = idOrHandle instanceof FleetHandle ? idOrHandle.id : idOrHandle;
+		const handle = idOrHandle instanceof FleetHandle ? idOrHandle : this._save.getFleetById(idOrHandle);
+		const array = this.$('fleets_manager').$('owned_fleets').valueAsObject();
+		const index = array.findIndex(o => $(o[1]).$('fleet')._ == id);
+		if (index !== -1) {
+			const ownership = new FleetOwnershipHandle($(array[index]?.[1]!), this);
+			const previousOwnerId = ownership.previousOwnerId;
+			if (previousOwnerId) {
+				// TODO: update fleet owner cache
+				ownership.previousOwner!.registerOwnedFleet(handle);
+			}
+			array.splice(index, 1);
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+
+	get fleetTemplatesCount(): number {
+		return this.$('fleet_template_manager').$('fleet_template').$$().length;
+	}
+	get fleetTemplatesIds(): ReadonlyArray<number> {
+		return this.$('fleet_template_manager').$('fleet_template').$$().map(e => e._ as number);
+	}
+	get fleetTemplates(): ReadonlyArray<FleetTemplateHandle> {
+		return this.fleetTemplatesIds.map(id => this._save.getFleetTemplateById(id));
+	}
+
+	registerFleetTemplate(idOrHandle: number | FleetTemplateHandle) {
+		const id = idOrHandle instanceof FleetTemplateHandle ? idOrHandle.id : idOrHandle;
+		const array = this.$('fleet_template_manager').$('fleet_template').valueAsObject();
+		const index = array.findIndex(e => e[1] == id);
+		if (index === -1) {
+			array.push([null, id]);
+		}
+	}
+	unregisterFleetTemplate(idOrHandle: number | FleetTemplateHandle) {
+		const id = idOrHandle instanceof FleetTemplateHandle ? idOrHandle.id : idOrHandle;
+		const array = this.$('fleet_template_manager').$('fleet_template').valueAsObject();
+		const index = array.findIndex(e => e[1] == id);
+		if (index !== -1) {
+			array.splice(index, 1);
+		}
+	}
+
+	////////////////////////////////////////////////////////////////////////////////
+
 	// TODO: armies
 	// TODO: economy
+
+	////////////////////////////////////////////////////////////////////////////////
 
 	get sectorIds(): ReadonlyArray<number> {
 		return this.$('sectors').$('owned').$$().map(e => e._ as number);
@@ -255,10 +432,16 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 	 */
 	remove(settings: {
 		// removeSpecies?: boolean;
+		fleets?: boolean,
+		fleetTemplates?: boolean,
 	} = {}) {
 		settings = Object.assign({
 			// removeSpecies: false,
+			fleets: true,
+			fleetTemplates: true,
 		}, settings);
+
+		console.debug(`Removing country '${this.name}' #${this.id}`);
 
 		// Remove leaders. Don't have to unassign them from sector and ships,
 		// as we remove the sector and ships as well.
@@ -267,26 +450,28 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 				leader.value = undefined;
 			}
 		}
-		this._save.leaders = this._save.leaders.filter(h => h.value == undefined);
+		this._save.leaders = this._save.leaders.filter(h => h.value != undefined);
 
 		// TODO: factions
 
 		// Remove fleets
-		const systemsVisited: number[] = [];
-		for (const fleet of this._save.fleets) {
-			if (fleet.ownerId === this.id) {
-				for (const ship of fleet.ships) {
-					ship.value = undefined;
-				}
-				fleet.unassignOrbit();
-				fleet.value = undefined;
-				if (fleet.isStation) {
-					const systemId = fleet.coords.origin;
-					if (!systemsVisited.includes(systemId)) {
-						systemsVisited.push(systemId);
-						const system = this._save.getSystemById(systemId);
-						system.setStarbase(undefined);
-					}
+		if (settings.fleets) {
+			for (const fleet of this.ownedFleets) {
+				fleet.remove();
+			}
+		}
+
+		// Fleet templates
+		if (settings.fleetTemplates) {
+			for (const template of this.fleetTemplates) {
+				template.value = undefined;
+			}
+			this._save.fleetTemplates = this._save.fleetTemplates.filter(h => h.value != undefined);
+		}
+		else {
+			if (settings.fleets) {
+				for (const template of this.fleetTemplates) {
+					template.setFleet(undefined);
 				}
 			}
 		}
@@ -299,6 +484,7 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 				army.value = undefined;
 			}
 		}
+		this._save.armies = this._save.armies.filter(h => h.value != undefined);
 
 		// Remove controller flag, colonies, local starbase
 		for (const planet of this._save.planets) {
@@ -316,6 +502,9 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 				sector.value = undefined;
 			}
 		}
+		this._save.sectors = this._save.sectors.filter(h => h.value != undefined);
+
+		// TODO: event targets?
 
 		this.value = undefined;
 	}

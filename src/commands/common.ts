@@ -35,15 +35,15 @@ export const addSaveFileInputHandlingToCommand = (
 		.option('-i, --input <savePath>', 'input save file path (can be relative to save directory)')
 		.option('-l, --latest', `work with latest played save file`)
 		// TODO: add forcing interactive prompt for input select
-		.hook('preAction', async (thisCommand, actionCommand) => {
-			const options = actionCommand.opts();
+		.hook('preAction', async (thisCommand) => {
+			const options = thisCommand.opts();
 
 			let providedPath = options.input;
 			if (settings.useArgument) {
 				if (settings.useArgument === true) {
-					settings.useArgument = actionCommand.processedArgs.length - 1;
+					settings.useArgument = thisCommand.processedArgs.length - 1;
 				}
-				providedPath ||= actionCommand.processedArgs[settings.useArgument] as string;
+				providedPath ||= thisCommand.processedArgs[settings.useArgument] as string;
 			}
 
 			let inputFilePath: string | undefined;
@@ -52,7 +52,10 @@ export const addSaveFileInputHandlingToCommand = (
 					inputFilePath = await selectSaveFileByString(providedPath);
 				}
 				catch (error) {
-					if (providedPath.toLowerCase() === 'latest') {
+					if (providedPath.toLowerCase() === 'interactive') {
+						inputFilePath = await selectSaveFilePrompt();
+					}
+					else if (providedPath.toLowerCase() === 'latest') {
 						try {
 							inputFilePath = await selectLatestSaveFile();
 						}
@@ -84,9 +87,9 @@ export const addSaveFileInputHandlingToCommand = (
 			}
 
 			if (settings.useArgument) {
-				actionCommand.processedArgs[settings.useArgument] = inputFilePath;
+				thisCommand.processedArgs[settings.useArgument] = inputFilePath;
 			}
-			actionCommand.setOptionValue('input', inputFilePath);
+			thisCommand.setOptionValue('input', inputFilePath);
 		})
 	;
 }
@@ -109,11 +112,17 @@ const ensureSavExt = (path: string) => {
 	}
 }
 
+/**
+ * Adds save file output handling options for command.
+ * 
+ * Note: Should be use after `addSaveFileInputHandlingToCommand`, if it's used,
+ * so it output can be deducted somewhat from input name/path if necessary.
+ */
 export const addSaveFileOutputHandlingToCommand = (
 	command: Command, 
-	settings: { interactive?: boolean, require?: boolean } = {}
+	settings: { interactive?: boolean, require?: boolean, defaultOutSuffix?: string } = {}
 ) => {
-	settings = Object.assign({ interactive: false, require: false }, settings);
+	settings = Object.assign({ interactive: false, require: false, defaultOutSuffix: '.out' }, settings);
 
 	// Basic `--output`
 	command
@@ -121,18 +130,18 @@ export const addSaveFileOutputHandlingToCommand = (
 	;
 
 	// Conditionally add options that rely on input option
-	if ((command as any)._findOption('--input')) {
+	if ((command as any)._findOption('--input') && (command as any)._findOption('--latest')) {
 		command
 			.option('--in-place', 'overwrite input save file with output file')
-			.option('--output-suffix [suffix]', `output save file path is the same as input file, but with suffix (it's default, with 'out' suffix)`)
+			.option('--output-suffix [suffix]', `output save file path is the same as input file, but with suffix (it's default, with '${settings.defaultOutSuffix}' suffix)`)
 			.option('--output-next-to-input <name>', `output save file path is file next to input file, using specified name.`)
 		;
 	}
 
 	// Hook logic
 	command
-		.hook('preAction', async (thisCommand, actionCommand) => {
-			const options = actionCommand.opts();
+		.hook('preAction', async (thisCommand) => {
+			const options = thisCommand.opts();
 
 			let outputFilePath: string | undefined;
 			if (options.output) {
@@ -143,7 +152,7 @@ export const addSaveFileOutputHandlingToCommand = (
 					outputFilePath = options.input;
 				}
 				else if (options.outputSuffix) {
-					const suffix = typeof options.outputSuffix === 'string' ? options.outputSuffix : '.out';
+					const suffix = typeof options.outputSuffix === 'string' ? options.outputSuffix : settings.defaultOutSuffix;
 					outputFilePath = ensureSavExt(stripFromSavExt(options.input) + suffix);
 				}
 				else if (options.outputNextToInput) {
@@ -158,17 +167,17 @@ export const addSaveFileOutputHandlingToCommand = (
 				}
 			}
 			if (!outputFilePath && settings.interactive) {
-				// TODO: interactive save output location picker? with default '.out'
+				// TODO: interactive save output location picker? with default settings.defaultOutSuffix
 			}
 			if (!outputFilePath) {
 				if (settings.require) {
 					process.exitCode = 2;
 					throw new MyError('output-not-specified', `Output file must be specified.`);
 				}
-				outputFilePath = ensureSavExt(stripFromSavExt(options.input) + '.out');
+				outputFilePath = ensureSavExt(stripFromSavExt(options.input) + settings.defaultOutSuffix);
 			}
 
-			actionCommand.setOptionValue('output', outputFilePath);
+			thisCommand.setOptionValue('output', outputFilePath);
 		})
 	;
 }

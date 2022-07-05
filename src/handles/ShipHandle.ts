@@ -1,8 +1,21 @@
 import { ParadoxDataEntry, ParadoxDataEntryHandle, ParadoxDataObject, ParadoxDataObjectHandle, stripSidesByCharacter } from "@/utils/paradox";
 import StellarisSave from "@/StellarisSave";
 import CoordsHandle from "./CoordsHandle";
-import { LeaderHandle } from "..";
+import LeaderHandle from "./LeaderHandle";
 import FleetHandle from "./FleetHandle";
+import ShipDesignHandle from "./ShipDesignHandle";
+import { getLogger } from "@/utils/logging";
+
+const addingShipLogger = getLogger('adding-ship');
+
+const getNewIdForNewShip = (save: StellarisSave) => {
+	let id = save.gamestate.$('last_created_ship').value as number + 1;
+	while (save.findShipById(id)) {
+		id += 1;
+	}
+	save.gamestate.$('last_created_ship').value = id;
+	return id;
+}
 
 export class ShipWeaponHandle extends ParadoxDataObjectHandle {
 	constructor(object: ParadoxDataObject | ParadoxDataEntryHandle) {
@@ -37,35 +50,13 @@ export class ShipSectionHandle extends ParadoxDataObjectHandle {
 		this.$('template')._ = `"${value}"`;
 	}
 
-	/**
-	 * Allow access section weapons by slot key (assuming they are unique).
-	 */
-	get weapons() {
-		return new Proxy({}, {
-			get: (_, key: string) => {
-				const entry = this.$$('section').find(e => e.$('slot')._ == `"${key}"`);
-				return entry ? new ShipWeaponHandle(entry) : undefined;
-			},
-			set: (_, key: string, value: ShipWeaponHandle | undefined) => {
-				let entry = this.$$('section').find(e => e.$('slot')._ == `"${key}"`);
-				if (!entry) {
-					if (value) {
-						const entries = this._ as ParadoxDataEntry[];
-						const slotEntryIndex = entries.findIndex(e => e[0] === 'slot');
-						entries.splice(slotEntryIndex, 0, ['section', value._]);
-					}
-				}
-				else {
-					entry._ = value ? value._ : undefined;
-				}
-				return true;
-			},
-		}) as (ShipWeaponHandle | undefined)[];
-	}
+	// TODO: weapons? idk, those handles will be hardly ever useful...
 }
 
 export class ShipHandle extends ParadoxDataEntryHandle {
 	_save: StellarisSave;
+	_sections: Map<string, ShipSectionHandle>;
+	_sectionsKeys: string[];
 
 	constructor(
 		entry: ParadoxDataEntry | ParadoxDataEntryHandle,
@@ -73,6 +64,13 @@ export class ShipHandle extends ParadoxDataEntryHandle {
 	) {
 		super(entry);
 		this._save = save;
+		this._sections = new Map(
+			this.$$('section').map(e => [
+				stripSidesByCharacter(e.$('slot')._ as string),
+				new ShipSectionHandle(e)
+			] as const)
+		);
+		this._sectionsKeys = [...this._sections.keys()];
 	}
 
 	////////////////////////////////////////////////////////////////////////////////
@@ -83,17 +81,15 @@ export class ShipHandle extends ParadoxDataEntryHandle {
 	}
 
 	get name() {
-		return stripSidesByCharacter(this.$('name')._ as string);
+		const nameEntry = this.$('name');
+		if (nameEntry.value === undefined) return undefined;
+		return stripSidesByCharacter(nameEntry.$('key')._ as string);
 	}
-	set name(value: string) {
-		this.$('name')._ = `"${value}"`;
-	}
-
-	get keyName() {
-		return stripSidesByCharacter(this.$('key')._ as string);
-	}
-	set keyName(value: string) {
-		this.$('key')._ = `"${value}"`;
+	set name(value: string | undefined) {
+		if (value === undefined) {
+			this.removeSubentriesByKey('name');
+		}
+		this.$('name').$('key')._ = `"${value}"`;
 	}
 
 	////////////////////////////////////////////////////////////////////////////////
@@ -128,29 +124,57 @@ export class ShipHandle extends ParadoxDataEntryHandle {
 	/**
 	 * Allow access sections by slot key (assuming they are unique).
 	 */
-	 get sections() {
+	get sections() {
 		return new Proxy({}, {
-			get: (_, key: string) => {
-				const entry = this.$$('section').find(e => e.$('slot')._ == `"${key}"`);
-				return entry ? new ShipSectionHandle(entry) : undefined;
+			get: (_, key: string | Symbol) => {
+				if (typeof key == 'string') {
+					return this._sections.get(key);
+				}
+				if (key === Symbol.iterator) {
+					const that = this;
+					return () => ({
+						index: -1,
+						next: function() {
+							const key = that._sectionsKeys[++this.index];
+							return {
+								done: !key,
+								value: key ? that._sections.get(key) : undefined,
+							}
+						}
+					})
+				}
+				return undefined;
 			},
 			set: (_, key: string, value: ShipSectionHandle | undefined) => {
-				// TODO: working add/delete, as `next_weapon_index`/weapon `index` might be necessary.
-				throw new Error('not-implemented');
-				// let entry = this.$$('section').find(e => e.$('slot')._ == `"${key}"`);
-				// if (!entry) {
-				// 	if (value) {
-				// 		const entries = this._ as ParadoxDataEntry[];
-				// 		const slotEntryIndex = entries.findIndex(e => e[0] === 'slot');
-				// 		entries.splice(slotEntryIndex, 0, ['section', value._]);
-				// 	}
-				// }
-				// else {
-				// 	entry._ = value ? value._ : undefined;
-				// }
-				// return true;
+				let entry = this.$$('section').find(e => e.$('slot')._ == `"${key}"`);
+				if (!entry) {
+					if (value) {
+						const entries = this._ as ParadoxDataEntry[];
+						const slotEntryIndex = entries.findIndex(e => e[0] === 'slot');
+						entries.splice(slotEntryIndex, 0, ['section', value._]);
+						this._sections.set(key, value);
+						this._sectionsKeys.push(key);
+					}
+				}
+				else {
+					entry._ = value ? value._ : undefined;
+					if (value) {
+						this._sections.set(key, value);
+					}
+					else {
+						this._sections.delete(key);
+						this._sectionsKeys = this._sectionsKeys.filter(a => a == key);
+					}
+				}
+				this.updateWeaponIndexes();
+				return true;
 			},
-		}) as (ShipSectionHandle | undefined)[];
+		}) as ShipSectionHandle[];
+	}
+
+	updateWeaponIndexes() {
+		// TODO: ... is it really necessary anyway?
+		// this.$('next_weapon_index').value
 	}
 
 	////////////////////////////////////////////////////////////////////////////////
@@ -217,6 +241,7 @@ export class ShipHandle extends ParadoxDataEntryHandle {
 	setFleet(idOrHandle: number | FleetHandle) {
 		const id = idOrHandle instanceof FleetHandle ? idOrHandle.id : idOrHandle;
 		this.$('fleet').value = id;
+		// TODO: owner? same origin?
 	}
 
 	get designId() {
@@ -244,9 +269,24 @@ export class ShipHandle extends ParadoxDataEntryHandle {
 		this.$('leader')._ = id;
 	}
 
-	remove() {
+	get experience() {
+		return (this.$('experience').value as number | undefined) || 0;
+	}
+	set experience(value: number) {
+		this.$('experience').value = value;
+	}
+
+	remove(settings: {
+		updateFleet?: boolean,
+	} = {}) {
+		settings = Object.assign({
+			updateFleet: true,
+		}, settings);
+
 		this.getLeader()?.unassign();
-		this.getFleet().removeShip(this);
+		if (settings.updateFleet) {
+			this.getFleet().removeShip(this);
+		}
 
 		// Remove from save global handles list
 		{
@@ -264,6 +304,90 @@ export class ShipHandle extends ParadoxDataEntryHandle {
 				array.splice(index, 1);
 			}
 		}
+
+		// TODO: event targets?
+	}
+
+	static async newFromDesign(design: ShipDesignHandle, fleet: FleetHandle, name?: string) {
+		const save = fleet._save;
+		const country = fleet.findOwner();
+		const id = getNewIdForNewShip(save);
+		name ||= `Ship ID ${id}`;
+		addingShipLogger.debug(`Adding new ship ID ${id} named '${name}' for country ID ${country.id}`);
+
+		// Make sure save includes design
+		const found = save.findShipDesignById(design.id);
+		if (found && found.value == design.value) {
+			// Okay, it's the one.
+		}
+		else {
+			design = design.copy(save);
+		}
+
+		const hitpoints = await design.calculateMaxHitpoints();
+
+		// Prepare new ship
+		const coords = fleet.coords.copy();
+		const object: ParadoxDataObject = [
+			['fleet', fleet.id],
+			['name', [
+				['key', `"${name}"`],
+			]],
+			['reserve', 0],
+			['ship_design', design.id],
+			// ['design_upgrade', design.id],
+			['graphical_culture', `"${country.shipGraphicalCulture}"`],
+		];
+		const entry: ParadoxDataEntry = [id, object];
+
+		// Copy sections (with 'weapon' for each weapon type component)
+		let nextWeaponIndex = 0;
+		for (const section of design.sections) {
+			const sectionObject: ParadoxDataObject = [
+				['design', section.$('template').value],
+				['slot', section.$('slot').value],
+			];
+			const sectionEntry: ParadoxDataEntry = ['section', sectionObject];
+			for (const component of section.components) {
+				const template = await component.getTemplate();
+				if (template.type == 'weapon') {
+					sectionObject.push(
+						['weapon', [
+							['index', nextWeaponIndex++],
+							['template', component.$('template').value],
+							['component_slot', component.$('slot').value],
+						]]
+					);
+				}
+			}
+			object.splice(7, 0, sectionEntry);
+		}
+
+		// Finish the entry
+		object.push(
+			['coordinate', coords.value],
+			['target_coordinate', coords.value],
+			['post_move_angle', 0],
+			['hitpoints', hitpoints.hull],
+			['shield_hitpoints', hitpoints.shield],
+			['armor_hitpoints', hitpoints.armor],
+			['max_hitpoints', hitpoints.hull],
+			['max_shield_hitpoints', hitpoints.shield],
+			['max_armor_hitpoints', hitpoints.armor],
+			['rotation', 0],
+			['forward_x', 1],
+			['forward_y', 0],
+			['upgrade_progress', 0],
+			['next_weapon_index', nextWeaponIndex],
+		);
+		const handle = new ShipHandle(entry, save);
+
+		// Register the ship
+		fleet.addShip(handle);
+		save.ships.push(handle);
+		save.gamestate.$('ships').valueAsObject().push(entry);
+
+		return handle;
 	}
 }
 

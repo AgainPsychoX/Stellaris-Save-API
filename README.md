@@ -5,6 +5,8 @@ This package provides simple work-in-progress API to modify Stellaris save files
 
 Note: the save structure can change between Stellaris versions, so the API provided by this package might be inaccurate.
 
+Currently working version: `Cepheus v3.4.5`.
+
 
 
 
@@ -41,6 +43,15 @@ After installing, the `ssa-cli` will be accessible to allow some tasks without w
 
 No releases will be provided, at least now. Installable NPM package will be provided in future.
 
+### Contributing mode
+
+1. Install [Node](https://nodejs.org/en/download/) (LTS should be fine) and `7-Zip`. Make sure they are accessible via `PATH` environment variable.
+2. Clone the repository, then navigate with command prompt to the project root directory.
+3. Use `npm install` to install dependencies.
+4. Run it (multiple options):
+	1. You can use `npm run cli:ts` to run it as Typescript (`ts-node` mode), passing params should look like: `npm run cli:ts --- --help`.
+	2. You can compile it (to JavaScript) by running `npm run build` once, then you can use `npm run cli:js` in similar fashion as above.
+5. <sub><sup>(Optional)</sup></sub> Use `npm link` (with admin privileges) to make the tool available as `ssa-cli --help`.
 
 
 
@@ -63,11 +74,7 @@ A lot of stuff still missing from higher abstraction handles, here are just exam
 - `PopHandle` (and relation for species and planet),
 - `BuildingHandle` (and relation for planet),
 - `PlanetHandle` (to name a few: moons, districts, armies, modifiers, expiable flags, stats...),
-- `CountryHandle` (flag, technologies, resources, events (it might be especially difficult, the same for anomalies, event chains, archeology), vision, AI relations, government, policies, fleets, fleet templates, armies,  leaders, rulers, intel, modifiers, flags, variables, traditions, perks, relics, edicts, sectors, planets...),
-- `FleetHandle`,
-- `ShipHandle`,
-- `ShipDesignHandle`,
-- `LeaderHandle`,
+- `CountryHandle` (flag, technologies, resources, events (it might be especially difficult, the same for anomalies, event chains, archeology), vision, AI relations, policies, armies, intel, modifiers, flags, variables, traditions, perks, relics, edicts...),
 - ...
 
 #### Reports
@@ -89,8 +96,15 @@ A lot of stuff still missing from higher abstraction handles, here are just exam
 
 #### Other
 
+- Since 3.3 or 3.4 names of almost all objects can use variables and stuff. Need to refactor all 'name' getters/setters. Maybe create `NameHandle` with all features and conversion to string, and allow setting simply `string`. For now, only key part of name is used as name string.
+- allow direct save input/output to/from unpacked state?
+- game data handles/structures could be useful (like `ComponentTemplate`).
+- optimize game save? (remove empty/none values, remove unused designs?, ...),
 - bird script (creating bird out of systems and hyperlanes between them),
 - fleet analysis tool (generating map to test fleets designs and compositions),
+- create tests, especially to detect save structure changes to allow smoother updates in future.
+- try using [Deno](https://deno.land/manual@v1.23.2/node) for even easier execution,
+- find a pattern for commander.js to use with multiple loggers or for filtering logs
 
 
 

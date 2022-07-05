@@ -1,5 +1,5 @@
 import os from 'os';
-import fs from 'fs/promises';
+import fs, { unlink } from 'fs/promises';
 import path from 'path';
 import { execFile } from 'child_process';
 import { MyError } from './common';
@@ -26,11 +26,11 @@ export const getSafeTemporaryDirectory = async () => {
 	const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'stellaris-'));
 	addCleanUpTask(async () => {
 		try {
-			console.debug(`cleaning up temporary directory ${directory}`);
+			console.debug(`Cleaning up temporary directory ${directory}`);
 			await fs.rm(directory, { recursive: true });
 		}
 		catch (error) {
-			console.warn(`warning: couldn't clean up temporary directory`);
+			console.warn(`Warning: couldn't clean up temporary directory`);
 			console.debug(error);
 		}
 	});
@@ -53,8 +53,19 @@ export const unpackSaveIntoTemporaryFiles = async (saveFilePath: string, directo
 	});
 };
 
-export const packTemporaryFilesIntoSave = async (saveFilePath: string, directory: string, showLogs: boolean = false) => {
-	const files = ['meta', 'gamestate'].map(n => path.join(directory, n));
+export const packTemporaryFilesIntoSave = async (saveFilePath: string, directory: string, showLogs: boolean = false, overwrite: boolean = true) => {
+	if (overwrite) {
+		try {
+			console.debug(`Removing '${saveFilePath}' before packing new archive`);
+			await unlink(saveFilePath);
+		}
+		catch (e: any) {
+			if (e.code != 'ENOENT') {
+				throw e;
+			}
+		}
+	}
+	const files = ['meta', 'gamestate'].map(n => path.resolve(path.join(directory, n)));
 	return new Promise<string>((resolve, reject) => {
 		const a7zipProcess = execFile(a7zipBin, ['a', saveFilePath, '-tZip', '-mm=Deflate', '-mtc=off'].concat(files), {}, (error, stdout, stderr) => {
 			if (error) {

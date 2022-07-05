@@ -20,10 +20,10 @@ export class PlanetHandle extends ParadoxDataEntryHandle {
 	}
 
 	get name() {
-		return stripSidesByCharacter(this.$('name')._ as string);
+		return stripSidesByCharacter(this.$('name').$('key')._ as string);
 	}
 	set name(value: string) {
-		this.$('name')._ = `"${value}"`;
+		this.$('name').$('key')._ = `"${value}"`;
 	}
 
 	get coords() {
