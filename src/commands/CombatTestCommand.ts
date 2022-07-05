@@ -228,11 +228,31 @@ export const registerCombatTestCommands = (parent: Command) => {
 				process.stdout.write(`Prepared ${requiredSystemsCount} battles`);
 			}
 
-			console.debug(`Moving remaining systems below...`);
+			console.debug(`Moving ally/enemy owned systems below...`);
 			{
-				const step = (gridEndOffsetX - gridStartOffsetX) / systemsToUse.length;
+				const step = (gridEndOffsetX - gridStartOffsetX) / (allySystemIds.size + enemySystemIds.size - 1);
 				let offsetX = gridStartOffsetX;
 				const offsetY = gridEndOffsetY + spacingY * 2;
+				for (const id of allySystemIds.values()) {
+					const system = save.getSystemById(id);
+					system.coords.screenX = offsetX;
+					system.coords.screenY = offsetY;
+					offsetX += step;
+				}
+				for (const id of enemySystemIds.values()) {
+					const system = save.getSystemById(id);
+					system.coords.screenX = offsetX;
+					system.coords.screenY = offsetY;
+					offsetX += step;
+				}
+			}
+
+			// TODO: as soon as `systemHandle.remove` is implemented, remove the systems.
+			console.debug(`Moving remaining systems further below...`);
+			{
+				const step = (gridEndOffsetX - gridStartOffsetX) / (systemsToUse.length - 1);
+				let offsetX = gridStartOffsetX;
+				const offsetY = gridEndOffsetY + spacingY * 4;
 				let system;
 				while (system = systemsToUse.pop()) {
 					system.coords.screenX = offsetX;
