@@ -162,6 +162,35 @@ export class FleetTemplateHandle extends ParadoxDataEntryHandle {
 		return template;
 	}
 
+	remove(settings: {
+		updateSave?: boolean,
+		removeFleet?: boolean,
+	} = {}) {
+		settings = Object.assign({
+			updateSave: true,
+			removeFleet: true,
+		}, settings);
+
+		const fleet = this.getFleet();
+		if (fleet) {
+			const country = fleet.findOwner();
+			country.unregisterFleetTemplate(this);
+
+			if (settings.removeFleet) {
+				// Remove linked fleet, if any
+				fleet.remove({
+					updateSave: settings.updateSave,
+					removeTemplate: false,
+				});
+			}	
+		}
+
+		this.value = undefined;
+		if (settings.updateSave) {
+			this._save.fleetTemplates = this._save.fleetTemplates.filter(h => h.value != undefined);
+		}
+	}
+
 	/**
 	 * Creates new fleet template for selected country, optionally (if 
 	 * coords provided) creates related fleet and ships to fill the design.

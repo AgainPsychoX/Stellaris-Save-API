@@ -1,5 +1,4 @@
 import { Command, Option } from 'commander';
-import { MyError } from '@/utils/common';
 import { addSaveFileInputHandlingToCommand, addSaveFileOutputHandlingToCommand, loadSaveFileFancy, saveSaveFileFancy } from './common';
 import StellarisSave from "@/StellarisSave";
 import CoordsHandle from '@/handles/CoordsHandle';
@@ -24,19 +23,21 @@ const ensureSystemCountForBattles = async (save: StellarisSave, requiredCount: n
 export const registerCombatTestCommands = (parent: Command) => {
 	const fleetsCommand = parent
 		.command('combat:fleets')
+		.description('prepares combat testing map by fighting with each other all fleets templates defined in fleet manager')
 		.addOption(new Option('--ally-empire <id>', 'select empire which will be used as first side of battle and default source of templates').default(0).argParser(s => parseInt(s)))
 		.addOption(new Option('--enemy-empire <id>', 'select empire which will be used as second side of battle').default(1).argParser(s => parseInt(s)))
 		.option('--grid', 'creating grid taking designs from both ally and enemy empires for each axis')
 		.option('--star-class <star_class>', 'star class to use for systems with battles', 'sc_b')
 		.addOption(new Option('--radius <radius>', 'radius to use for systems with battles').default(250).argParser(s => parseInt(s)))
 		.addOption(new Option('--distance <radius>', 'distance between fleets before battle').default(NaN, 'equal to radius').argParser(s => parseInt(s)))
-		.description('prepares combat testing map by fighting with each other all fleet compositions defined in fleet manager')
 		.action(async (options) => {
 			const save = await loadSaveFileFancy(options.input);
 
 			const allyEmpire    = save.getCountryById(options.allyEmpire);
 			const enemyEmpire   = save.getCountryById(options.enemyEmpire);
 			const preserveCountriesIds = [allyEmpire.id, enemyEmpire.id];
+
+			save.deleteKilledFleetTemplates();
 
 			console.debug(`Print fleet templates for reference...`);
 			{
@@ -270,10 +271,6 @@ export const registerCombatTestCommands = (parent: Command) => {
 	;
 	addSaveFileInputHandlingToCommand(fleetsCommand);
 	addSaveFileOutputHandlingToCommand(fleetsCommand);
-
-	// TODO: subcommand for designs testing
-	// TODO: subcommand for composition testing
-	// TODO: subcommand for random design testing
 
 	return {
 		fleetsCommand

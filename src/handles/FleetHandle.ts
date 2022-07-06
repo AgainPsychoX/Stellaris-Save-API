@@ -245,12 +245,12 @@ export class FleetHandle extends ParadoxDataEntryHandle {
 	}
 
 	remove(settings: {
-		updateHandles?: boolean,
-		// removeTemplate?: boolean,
+		updateSave?: boolean,
+		removeTemplate?: boolean,
 	} = {}) {
 		settings = Object.assign({
-			updateHandles: true,
-			// removeTemplate: false,
+			updateSave: true,
+			removeTemplate: false,
 		}, settings);
 
 		// Ships
@@ -260,6 +260,7 @@ export class FleetHandle extends ParadoxDataEntryHandle {
 
 		// Country
 		this.findOwner().unregisterOwnedFleet(this);
+		if (this.id == 0) console.warn(`DELETED FLEET ID #0`)
 
 		// System
 		const systemId = this.coords.origin;
@@ -277,17 +278,19 @@ export class FleetHandle extends ParadoxDataEntryHandle {
 		// Templates
 		const template = this.getTemplate();
 		if (template) {
-			// TODO: template.remove();
-			// if (settings.removeTemplate) {
-			// 	template.remove();
-			// }
+			if (settings.removeTemplate) {
+				template.remove({
+					updateSave: settings.updateSave,
+					removeFleet: false,
+				});
+			}
 			template.setFleet(undefined);
 		}
 		this.setTemplate(undefined);
 
 		// Remove
 		this.value = undefined;
-		if (settings.updateHandles) {
+		if (settings.updateSave) {
 			this._save.fleets = this._save.fleets.filter(h => h.value != undefined);
 		}
 	}

@@ -597,6 +597,13 @@ export class StellarisSave {
 		return template;
 	}
 
+	deleteKilledFleetTemplates() {
+		for (const fleetTemplate of this.fleetTemplates.filter(f => f.$('killed').value == 'yes')) {
+			fleetTemplate.remove({ updateSave: false });
+		}
+		this.fleetTemplates = this.fleetTemplates.filter(h => h.value != undefined);
+	}
+
 	////////////////////////////////////////////////////////////////////////////////
 	// Army
 
