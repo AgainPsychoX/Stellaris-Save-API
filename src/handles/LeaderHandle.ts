@@ -1,6 +1,6 @@
 import StellarisSave from "@/StellarisSave";
-import { ParadoxDataEntry, ParadoxDataEntryHandle, stripSidesByCharacter } from "@/utils/paradox";
-import { PlanetHandle } from "..";
+import { ParadoxDataEntry, ParadoxDataEntryHandle, stripSidesByCharacter, UndefinedId } from "@/utils/paradox";
+import PlanetHandle from "./PlanetHandle";
 import CountryHandle from "./CountryHandle";
 import SectorHandle from "./SectorHandle";
 import ShipHandle from "./ShipHandle";
@@ -79,6 +79,7 @@ export class LeaderHandle extends ParadoxDataEntryHandle {
 		const location = this.$('location');
 		const type = location.$('type').value as string;
 		const id = location.$('id').value as number;
+		if (id == UndefinedId) return undefined;
 		switch (type) {
 			case 'planet': {
 				return [this._save.getPlanetById(id)] as const;
@@ -92,9 +93,8 @@ export class LeaderHandle extends ParadoxDataEntryHandle {
 			case 'ship': {
 				return [this._save.getShipById(id)] as const;
 			}
-			default:
-				return [];
 		}
+		return undefined;
 	}
 
 	setLocation(value: [handle: PlanetHandle | SectorHandle | CountryHandle | ShipHandle, area?: string, assignment?: string]) {
@@ -146,7 +146,7 @@ export class LeaderHandle extends ParadoxDataEntryHandle {
 			country.setScientistLeader('engineering', undefined);
 		}
 		const location = this.getLocation();
-		const handle = location[0];
+		const handle = location && location[0];
 		if (handle instanceof PlanetHandle) {
 			// Ruler or unassigned, nothing to do?
 		}
@@ -159,7 +159,10 @@ export class LeaderHandle extends ParadoxDataEntryHandle {
 		else if (handle instanceof SectorHandle) {
 			handle.setGovernor(undefined);
 		}
-		this.setLocation([country.getCapital()]);
+		const capital = country.getCapital();
+		if (capital) {
+			this.setLocation([capital]);
+		}
 	}
 
 	remove(settings: {
@@ -173,9 +176,7 @@ export class LeaderHandle extends ParadoxDataEntryHandle {
 			const country = this._save.findCountryById(this.countryId);
 			if (country) {
 				this.unassign();
-				if (country.ownedLeadersIds.includes(this.id)) {
-					country.removeLeader(this);
-				}
+				country.removeLeader(this);
 			}
 		}
 

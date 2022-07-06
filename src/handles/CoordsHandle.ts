@@ -1,10 +1,10 @@
 import { structuredClone } from "@/utils/common";
-import { ParadoxDataEntryHandle, ParadoxDataObject, ParadoxDataObjectHandle } from "@/utils/paradox";
+import { ParadoxDataEntryHandle, ParadoxDataObject, ParadoxDataObjectHandle, UndefinedId } from "@/utils/paradox";
 
 /**
  * Special origin for objects in galaxy view, typically used by systems.
  */
-export const GalaxyOrigin = 4294967295;
+export const GalaxyOrigin = UndefinedId;
 
 export interface CoordsPair {
 	x: number;

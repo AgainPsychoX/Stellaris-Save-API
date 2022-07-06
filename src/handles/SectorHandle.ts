@@ -1,11 +1,11 @@
 import StellarisSave from "@/StellarisSave";
 import { MyError } from "@/utils/common";
-import { ParadoxDataEntry, ParadoxDataEntryHandle, stripSidesByCharacter } from "@/utils/paradox";
+import { ParadoxDataEntry, ParadoxDataEntryHandle, stripSidesByCharacter, UndefinedId } from "@/utils/paradox";
 import CountryHandle from "./CountryHandle";
 import LeaderHandle from "./LeaderHandle";
 import { SystemHandle } from "./SystemHandle";
 
-export const UndefinedSectorId = 4294967295;
+export const UndefinedSectorId = UndefinedId;
 
 export class SectorHandle extends ParadoxDataEntryHandle {
 	_save: StellarisSave;

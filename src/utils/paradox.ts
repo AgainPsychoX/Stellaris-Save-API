@@ -1,5 +1,7 @@
 import { ParserError } from "./common";
 
+export const UndefinedId = 4294967295;
+
 export type ParadoxDataPrimitive = string | number;
 
 export type ParadoxDataPiece = ParadoxDataPrimitive | ParadoxDataObject;

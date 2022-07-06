@@ -1,4 +1,4 @@
-import { $, ParadoxDataEntry, ParadoxDataEntryHandle, ParadoxDataObject, ParadoxDataObjectHandle, stripSidesByCharacter } from "@/utils/paradox";
+import { $, ParadoxDataEntry, ParadoxDataEntryHandle, ParadoxDataObject, ParadoxDataObjectHandle, stripSidesByCharacter, UndefinedId } from "@/utils/paradox";
 import { MyError } from "@/utils/common";
 import StellarisSave from "@/StellarisSave";
 import PlanetHandle from "./PlanetHandle";
@@ -9,7 +9,7 @@ import FleetHandle from "./FleetHandle";
 import FleetTemplateHandle from "./FleetTemplateHandle";
 import SystemHandle from "./SystemHandle";
 
-export const UndefinedCountry = 4294967295;
+export const UndefinedCountry = UndefinedId;
 
 export class FleetOwnershipHandle extends ParadoxDataObjectHandle {
 	_owner: CountryHandle;
@@ -150,10 +150,12 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 	// Related
 
 	get capitalId() {
-		return this.$('capital')._ as number;
+		return this.$('capital')._ as number | undefined;
 	}
 	getCapital() {
-		return this._save.getPlanetById(this.capitalId);
+		const id = this.capitalId;
+		if (id === undefined) return undefined;
+		return this._save.getPlanetById(id);
 	}
 	setCapital(idOrHandle: number | PlanetHandle | undefined) {
 		this.$('capital')._ = typeof idOrHandle === 'object' ? idOrHandle.id : idOrHandle;
@@ -443,14 +445,12 @@ export class CountryHandle extends ParadoxDataEntryHandle {
 
 		console.debug(`Removing country '${this.name}' #${this.id}`);
 
-		// Remove leaders. Don't have to unassign them from sector and ships,
-		// as we remove the sector and ships as well.
+		// Remove leaders
 		for (const leader of this._save.leaders) {
 			if (leader.countryId === this.id) {
-				leader.value = undefined;
+				leader.remove();
 			}
 		}
-		this._save.leaders = this._save.leaders.filter(h => h.value != undefined);
 
 		// TODO: factions
 
