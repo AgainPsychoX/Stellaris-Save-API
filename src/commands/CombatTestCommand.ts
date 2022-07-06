@@ -137,11 +137,13 @@ export const registerCombatTestCommands = (parent: Command) => {
 					allyTemplate, 
 					allyEmpire, 
 					CoordsHandle.forNewObject(-fleetX, -fleetY, system.id),
+					`[#${allyTemplate.id}] vs #${enemyTemplate.id}`
 				);
 				const enemyFleet = await FleetHandle.newFromTemplate(
 					enemyTemplate, 
 					enemyEmpire, 
 					CoordsHandle.forNewObject(fleetX, fleetY, system.id),
+					`#${allyTemplate.id} vs [#${enemyTemplate.id}]`
 				);
 				allyFleet.orderAttack(enemyFleet);
 				enemyFleet.orderAttack(allyFleet);

@@ -34,6 +34,7 @@ After installing, the `ssa-cli` will be accessible to allow some tasks without w
 + `pack`/`unpack` - packing/unpacking the save files.
 + `precursors` - generating in-game map of precursors systems (see source or use `debugtoolip` to inspect "colors").
 + `report` - reporting some stuff about countries (WIP).
++ `combat:fleets` - Prepares combat testing map by fighting with each other all fleets templates defined in fleet manager. Game console commands like `research_all_technologies 1 0` or `research_technology tech_strike_craft_2` could be useful to give technologies to setup fleets.
 
 
 
@@ -66,6 +67,12 @@ There is a lot of missing functionalities, but base handles allow to easy enough
 - `editor` (unpack, open editor, pack after closed or file modified (`--watch` mode)),
 - `report` (a lot more stuff to add, use better cli structure),
 - `play` (start the save file in the game; see how launcher does it),
+- `combat:fleets`:
+	- `--filter` (filtering designs to use, i.e. `--filter 'Montu *'`)
+	- raport of previous combat testing results if loaded save of after the combat?
+	- `--npc` (testing given fleet compositions vs NPC designs like guardians, leviathan, fallen empire fleets, ...)
+	- add some (sane) hyperlanes to avoid automatic hyperlanes fixing after game loads.
+	- implement `system.remove` (and update combat tests); using fresh systems would be cleaner.
 
 #### Handles
 
@@ -101,10 +108,8 @@ A lot of stuff still missing from higher abstraction handles, here are just exam
 - game data handles/structures could be useful (like `ComponentTemplate`).
 - optimize game save? (remove empty/none values, remove unused designs?, ...),
 - bird script (creating bird out of systems and hyperlanes between them),
-- fleet analysis tool (generating map to test fleets designs and compositions),
 - create tests, especially to detect save structure changes to allow smoother updates in future.
 - try using [Deno](https://deno.land/manual@v1.23.2/node) for even easier execution,
-- find a pattern for commander.js to use with multiple loggers or for filtering logs
 
 
 
