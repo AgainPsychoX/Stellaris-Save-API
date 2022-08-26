@@ -12,7 +12,7 @@ import { setGameDirectory } from "./utils/gameData";
 import { setupLogging } from "./utils/logging";
 
 if (process.platform != 'win32') {
-	console.error('Only Windows is support for now!')
+	console.error('Only Windows is supported for now!')
 	process.exit(1);
 }
 

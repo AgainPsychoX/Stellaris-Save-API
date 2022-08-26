@@ -46,7 +46,7 @@ No releases will be provided, at least now. Installable NPM package will be prov
 
 ### Contributing mode
 
-1. Install [Node](https://nodejs.org/en/download/) (LTS should be fine) and `7-Zip`. Make sure they are accessible via `PATH` environment variable.
+1. Install [Node](https://nodejs.org/en/download/) (LTS should be fine) and [7-Zip](https://www.7-zip.org/). Make sure they are accessible via `PATH` environment variable.
 2. Clone the repository, then navigate with command prompt to the project root directory.
 3. Use `npm install` to install dependencies.
 4. Run it (multiple options):
@@ -68,7 +68,6 @@ There is a lot of missing functionalities, but base handles allow to easy enough
 - `report` (a lot more stuff to add, use better cli structure),
 - `play` (start the save file in the game; see how launcher does it),
 - `combat:fleets`:
-	- `--filter` (filtering designs to use, i.e. `--filter 'Montu *'`)
 	- raport of previous combat testing results if loaded save of after the combat?
 	- `--npc` (testing given fleet compositions vs NPC designs like guardians, leviathan, fallen empire fleets, ...)
 	- add some (sane) hyperlanes to avoid automatic hyperlanes fixing after game loads.
